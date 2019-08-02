@@ -50,5 +50,11 @@ namespace Xilium.CefGlue.WPF
         {
             return _jsDialogHandler;
         }
+
+        protected override bool OnProcessMessageReceived(CefBrowser browser, CefProcessId sourceProcess, CefProcessMessage message)
+        {
+            _owner.OnProcessMessageReceived(message);
+            return true;
+        }
     }
 }

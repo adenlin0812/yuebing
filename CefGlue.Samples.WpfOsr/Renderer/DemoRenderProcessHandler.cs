@@ -12,6 +12,7 @@ namespace Xilium.CefGlue.Samples.WpfOsr
     class DemoRenderProcessHandler : CefRenderProcessHandler
     {
         internal static bool DumpProcessMessages { get; private set; }
+        private CefV8Context _context;
 
         public DemoRenderProcessHandler()
         {
@@ -22,10 +23,17 @@ namespace Xilium.CefGlue.Samples.WpfOsr
 
         protected override void OnContextCreated(CefBrowser browser, CefFrame frame, CefV8Context context)
         {
-            using (var global = context.GetGlobal())
+            if (browser.Identifier != 1)
+            {
+                return;
+            }
+
+            _context = context;
+            using (var global = _context.GetGlobal())
             {
                 try
                 {
+                    _context.Enter();
                     var handler = new GlobalV8HandlerExt(browser);
                     using (var extApi = CefV8Value.CreateObject())
                     {
@@ -34,8 +42,14 @@ namespace Xilium.CefGlue.Samples.WpfOsr
                             extApi.SetValue("getElementPosition", getElementPositionFunc, 
                                 CefV8PropertyAttribute.ReadOnly | CefV8PropertyAttribute.DontEnum | CefV8PropertyAttribute.DontDelete);
                         }
+                        using (var getElementPositionByInnerTextFunc = CefV8Value.CreateFunction("getElementPositionByInnerText", handler))
+                        {
+                            extApi.SetValue("getElementPositionByInnerText", getElementPositionByInnerTextFunc,
+                                CefV8PropertyAttribute.ReadOnly | CefV8PropertyAttribute.DontEnum | CefV8PropertyAttribute.DontDelete);
+                        }
                         global.SetValue("extApi", extApi);
                     }
+                    _context.Exit();
                 }
                 catch
                 {
@@ -51,41 +65,66 @@ namespace Xilium.CefGlue.Samples.WpfOsr
 
         protected override bool OnProcessMessageReceived(CefBrowser browser, CefProcessId sourceProcess, CefProcessMessage message)
         {
-            if (DumpProcessMessages)
+            switch(message.Name)
             {
-                Console.WriteLine("Render::OnProcessMessageReceived: SourceProcess={0}", sourceProcess);
-                Console.WriteLine("Message Name={0} IsValid={1} IsReadOnly={2}", message.Name, message.IsValid, message.IsReadOnly);
-                var arguments = message.Arguments;
-                for (var i = 0; i < arguments.Count; i++)
-                {
-                    var type = arguments.GetValueType(i);
-                    object value;
-                    switch (type)
+                case "getElementPosition":
                     {
-                        case CefValueType.Null: value = null; break;
-                        case CefValueType.String: value = arguments.GetString(i); break;
-                        case CefValueType.Int: value = arguments.GetInt(i); break;
-                        case CefValueType.Double: value = arguments.GetDouble(i); break;
-                        case CefValueType.Bool: value = arguments.GetBool(i); break;
-                        default: value = null; break;
+                        _context.Enter();
+                        string elementClass = message.Arguments.GetString(0);
+                        string elementId = message.Arguments.GetString(1);
+                        string jsCode = string.Format("extApi.getElementPosition(\"{0}\",\"{1}\")", elementClass, elementId);
+                        int hash = message.Arguments.GetInt(message.Arguments.Count - 1);
+
+                        CefV8Value outValue;
+                        CefV8Exception exception;
+                        bool result = browser.GetMainFrame().V8Context.TryEval(jsCode, "", 0, out outValue, out exception);
+                        if (result)
+                        {
+                            //funcConsoleLog.ExecuteFunction(funcConsoleLog, new CefV8Value[] { outValue });
+                            // 构造消息及参数
+                            CefProcessMessage msg = CefProcessMessage.Create("getElementPosition");
+                            using (CefListValue cefListVal = msg.Arguments)
+                            {
+                                cefListVal.SetDouble(0, outValue.GetValue("x").GetDoubleValue());
+                                cefListVal.SetDouble(1, outValue.GetValue("y").GetDoubleValue());
+                                cefListVal.SetInt(2, hash);
+                            }
+                            browser.SendProcessMessage(CefProcessId.Browser, msg);
+                        }
+                        _context.Exit();
                     }
+                    break;
 
-                    Console.WriteLine("  [{0}] ({1}) = {2}", i, type, value);
-                }
+                case "getElementPositionByInnerText":
+                    {
+                        _context.Enter();
+                        string innerTextToFind = message.Arguments.GetString(0);
+                        string jsCode = string.Format("extApi.getElementPositionByInnerText(\"{0}\")", innerTextToFind);
+                        int hash = message.Arguments.GetInt(message.Arguments.Count - 1);
+
+                        CefV8Value outValue;
+                        CefV8Exception exception;
+                        bool result = browser.GetMainFrame().V8Context.TryEval(jsCode, "", 0, out outValue, out exception);
+                        if (result)
+                        {
+                            //funcConsoleLog.ExecuteFunction(funcConsoleLog, new CefV8Value[] { outValue });
+                            // 构造消息及参数
+                            CefProcessMessage msg = CefProcessMessage.Create("getElementPositionByInnerText");
+                            using (CefListValue cefListVal = msg.Arguments)
+                            {
+                                cefListVal.SetDouble(0, outValue.GetValue("x").GetDoubleValue());
+                                cefListVal.SetDouble(1, outValue.GetValue("y").GetDoubleValue());
+                                cefListVal.SetInt(2, hash);
+                            }
+                            browser.SendProcessMessage(CefProcessId.Browser, msg);
+                        }
+                        _context.Exit();
+                    }
+                    break;
+
+                default:
+                    break;
             }
-
-            var handled = MessageRouter.OnProcessMessageReceived(browser, sourceProcess, message);
-            if (handled) return true;
-
-            if (message.Name == "myMessage2") return true;
-
-            var message2 = CefProcessMessage.Create("myMessage2");
-            var success = browser.SendProcessMessage(CefProcessId.Renderer, message2);
-            Console.WriteLine("Sending myMessage2 to renderer process = {0}", success);
-
-            var message3 = CefProcessMessage.Create("myMessage3");
-            var success2 = browser.SendProcessMessage(CefProcessId.Browser, message3);
-            Console.WriteLine("Sending myMessage3 to browser process = {0}", success);
 
             return false;
         }

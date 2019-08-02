@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -28,6 +31,8 @@ namespace Xilium.CefGlue.WPF
         private int _browserWidth;
         private int _browserHeight;
         private bool _browserSizeChanged;
+
+        private Dictionary<int, Action<CefProcessMessage>> _procCallingMappingTable = new Dictionary<int, Action<CefProcessMessage>>();
 
         private CefBrowser _browser;
         private CefBrowserHost _browserHost;
@@ -133,7 +138,6 @@ namespace Xilium.CefGlue.WPF
         public event LoadingStateChangeEventHandler LoadingStateChange;
         public event LoadErrorEventHandler LoadError;
 
-
         internal void OnLoadStart(CefFrame frame)
         { 
             if (this.LoadStart != null)
@@ -194,6 +198,47 @@ namespace Xilium.CefGlue.WPF
                 this._browser.GetMainFrame().ExecuteJavaScript(code, url, line);
         }
 
+        public void GetElementPosition(string elementClass, string elementId, 
+            Action<double, double> receivePositionInfoHandler)
+        {
+            CefProcessMessage message = CefProcessMessage.Create("getElementPosition");
+            
+            message.Arguments.SetString(0, elementClass);
+            message.Arguments.SetString(1, elementId);
+
+            SendCommandToBrowser(message, (CefProcessMessage recvMsg) => {
+                receivePositionInfoHandler(recvMsg.Arguments.GetDouble(0),
+                    recvMsg.Arguments.GetDouble(1));
+            });
+        }
+
+        public void getElementPositionByInnerText(string textToFind, Action<double, double> receivePositionInfoHandler)
+        {
+            CefProcessMessage message = CefProcessMessage.Create("getElementPositionByInnerText");
+
+            message.Arguments.SetString(0, textToFind);
+
+            SendCommandToBrowser(message, (CefProcessMessage recvMsg) => {
+                receivePositionInfoHandler(recvMsg.Arguments.GetDouble(0),
+                    recvMsg.Arguments.GetDouble(1));
+            });
+        }
+
+        protected void SendCommandToBrowser(CefProcessMessage message, Action<CefProcessMessage> messageReceiveHandler)
+        {
+            _procCallingMappingTable.Add(message.GetHashCode(), messageReceiveHandler);
+            message.Arguments.SetInt(message.Arguments.Count, message.GetHashCode());
+            _browser.SendProcessMessage(CefProcessId.Renderer, message);
+        }
+
+        public void OnProcessMessageReceived(CefProcessMessage message)
+        {
+            int hash = message.Arguments.GetInt(message.Arguments.Count - 1);
+            if (_procCallingMappingTable.ContainsKey(hash))
+            {
+                _procCallingMappingTable[hash](message);
+            }
+        }
 
         protected override Size ArrangeOverride(Size arrangeBounds)
         {
@@ -829,6 +874,14 @@ namespace Xilium.CefGlue.WPF
             }
 
             _mainUiDispatcher.Invoke(new Action(() => _popup.IsOpen = show));
+        }
+
+        public void ShowDevTools()
+        {
+            var wi = CefWindowInfo.Create();
+            wi.SetAsPopup(IntPtr.Zero, "DevTools");
+
+            _browserHost.ShowDevTools(wi, new WpfCefClient(this), new CefBrowserSettings(), new CefPoint(0, 0));
         }
 
         internal void OnPopupSize(CefRectangle rect)

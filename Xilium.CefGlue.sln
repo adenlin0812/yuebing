@@ -1,6 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
+# Visual Studio 14
+VisualStudioVersion = 14.0.25420.1
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CefGlue", "CefGlue\CefGlue.csproj", "{703FF300-34B9-48D4-A5D6-E741F48D5F95}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CefGlue.Client", "CefGlue.Client\CefGlue.Client.csproj", "{311984DF-EB92-4B01-B4AD-C7E73A13E271}"
@@ -13,7 +15,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CefGlue.Demo.WinForms", "Ce
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CefGlue.Demo.GtkSharp", "CefGlue.Demo.GtkSharp\CefGlue.Demo.GtkSharp.csproj", "{70544727-2A93-40A8-A708-B7BB043CDCE5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CefGlue.Samples.WpfOsr", "CefGlue.Samples.WpfOsr\CefGlue.Samples.WpfOsr.csproj", "{8E758128-CA79-4533-963E-91A1BF0558FB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YueBing", "CefGlue.Samples.WpfOsr\YueBing.csproj", "{8E758128-CA79-4533-963E-91A1BF0558FB}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CefGlue.WPF", "CefGlue.WPF\CefGlue.WPF.csproj", "{447C6790-E36E-4A54-BFAC-06C92FFF4AA3}"
 EndProject

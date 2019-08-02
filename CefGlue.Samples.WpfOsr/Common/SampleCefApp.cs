@@ -8,19 +8,33 @@
 
     internal sealed class SampleCefApp : CefApp
     {
-        public SampleCefApp()
+        private static SampleCefApp _instance = null;
+
+        private CefRenderProcessHandler _renderProcessHandler = new DemoRenderProcessHandler();
+
+
+        public static SampleCefApp GetInstance()
         {
+            // 如果类的实例不存在则创建，否则直接返回
+            if (_instance == null)
+            {
+                _instance = new SampleCefApp();
+            }
+            return _instance;
+        }
+
+        private SampleCefApp()
+        {
+
         }
 
         protected override void OnBeforeCommandLineProcessing(string processType, CefCommandLine commandLine)
         {
-            if (string.IsNullOrEmpty(processType))
-            {
-                commandLine.AppendSwitch("disable-gpu");
-                commandLine.AppendSwitch("disable-gpu-compositing");
-                commandLine.AppendSwitch("enable-begin-frame-scheduling");
-                commandLine.AppendSwitch("disable-smooth-scrolling");
-            }
+        }
+
+        protected override CefRenderProcessHandler GetRenderProcessHandler()
+        {
+            return _renderProcessHandler;
         }
     }
 }
