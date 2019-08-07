@@ -20,6 +20,8 @@
             _lifeSpanHandler = new WebLifeSpanHandler(_core);
             _displayHandler = new WebDisplayHandler(_core);
             _loadHandler = new WebLoadHandler(_core);
+
+            DumpProcessMessages = true;
         }
 
         protected override CefLifeSpanHandler GetLifeSpanHandler()

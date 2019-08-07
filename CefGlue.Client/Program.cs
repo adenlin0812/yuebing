@@ -47,7 +47,7 @@
             var settings = new CefSettings
                 {
                     BrowserSubprocessPath = browserProcessPath,
-                    SingleProcess = false,
+                    SingleProcess = true,
                     MultiThreadedMessageLoop = true,
                     LogSeverity = CefLogSeverity.Disable,
                     LogFile = "CefGlue.log",

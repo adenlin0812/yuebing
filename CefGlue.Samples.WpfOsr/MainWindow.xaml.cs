@@ -1,7 +1,9 @@
 ﻿namespace Xilium.CefGlue.Samples.WpfOsr
 {
+    using Newtonsoft.Json;
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using System.Linq;
     using System.Runtime.InteropServices;
     using System.Text;
@@ -38,6 +40,12 @@
         const int MOUSEEVENTF_MIDDLEDOWN = 0x0020;
         const int MOUSEEVENTF_MIDDLEUP = 0x0040;
         const int MOUSEEVENTF_ABSOLUTE = 0x8000;
+
+        private bool _isStopRecord = true;
+
+        private int _pathStep = 0;
+        private List<Point> _step1MousePathCollection = new List<Point>();
+
 
         private DispatcherTimer movementTimer = new DispatcherTimer();
         private DispatcherTimer step1Timer = new DispatcherTimer();
@@ -107,6 +115,16 @@
             public short wParamH;
         }
 
+        const uint MAPVK_VK_TO_VSC = 0x00;
+        const uint MAPVK_VSC_TO_VK = 0x01;
+        const uint MAPVK_VK_TO_CHAR = 0x02;
+        const uint MAPVK_VSC_TO_VK_EX = 0x03;
+        const uint MAPVK_VK_TO_VSC_EX = 0x04;
+
+        [DllImport("user32.dll")]
+        static extern uint MapVirtualKeyW(uint uCode, uint uMapType);
+
+
         [DllImport("user32.dll")]
         public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
@@ -127,7 +145,7 @@
 
         public MainWindow()
         {
-            movementTimer.Interval = new TimeSpan(0, 0, 0, 0, 100);
+            movementTimer.Interval = new TimeSpan(0, 0, 0, 0, 1);
             movementTimer.Tick += OnMouseTimerTick;
 
             InitializeComponent();
@@ -153,9 +171,36 @@
                 movementTimer.Stop();
                 mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
                 mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
-                OnMouseMoveEnd();
+                //OnMouseMoveEnd();
             }
             mouse_event(MOUSEEVENTF_MOVE, stepx, stepy, 0, 0);
+        }
+
+        private void MoveMouse()
+        {
+            ((Action)(() =>
+            {
+                foreach (var item in _step1MousePathCollection)
+                {
+                    double stepx = item.X;
+                    double stepy = item.Y;
+                    _pathStep++;
+                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE, (int)(stepx / 1920 * 65535), (int)(stepy / 1080 * 65535), 0, 0);
+
+                    if (_pathStep == _step1MousePathCollection.Count - 1)
+                    {
+                        movementTimer.Stop();
+                        mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+                        mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+                    }
+                    Thread.Sleep(20);
+                }
+                
+                SimulateInputString("yidong fangwu ");
+                Thread.Sleep(100);
+                SimulateInputString("xiangfang jingzhuangxiu ");
+                OnInputSearchStringEnd();
+            })).BeginInvoke(null, null);
         }
 
         protected override void OnClosed(EventArgs e)
@@ -172,36 +217,22 @@
             }
         }
 
-        private void OnMouseMoveEnd()
+        private void OnInputSearchStringEnd()
         {
-            if (step == 0)
+            step1Timer.Interval = new TimeSpan(0, 0, 4);
+            step1Timer.Tick += ((object sender, EventArgs e) =>
             {
-                this.Dispatcher.Invoke((Action)(() =>
-                {
-                    SimulateInputString("宇宙超级无敌集装箱房");
-                }));
-                
-                //INPUT[] keyInput = new INPUT[1];
-                //keyInput[0].type = 1;//模拟键盘
-                //keyInput[0].ki.wVk = 0x0d;//enter键
-                //keyInput[0].ki.dwFlags = 0;//按下
-                //SendInput(1u, keyInput, Marshal.SizeOf((object)default(INPUT)));
-                
-                step1Timer.Interval = new TimeSpan(0, 0, 4);
-                step1Timer.Tick += ((object sender, EventArgs e) =>
-                {
-                    step = 1;
-                    step1Timer.Stop();
-                    browser.getElementPositionByInnerText("宇宙超级无敌集装箱房", (x, y) => {
-                        this.Dispatcher.Invoke((Action)(() =>
-                        {
-                            var sreenPoint = PointToScreen(new Point(x + 5, y + 25 + 5)); // 25是地址栏的高度
-                            MoveMouseToPoint((int)sreenPoint.X, (int)sreenPoint.Y);
-                        }), null);
-                    });
+                step = 1;
+                step1Timer.Stop();
+                browser.getElementPositionByInnerText("移动房屋箱房精装修", (x, y) => {
+                    this.Dispatcher.Invoke((Action)(() =>
+                    {
+                        var sreenPoint = PointToScreen(new Point(x + 5, y + 25 + 5)); // 25是地址栏的高度
+                        MoveMouseToPoint((int)sreenPoint.X, (int)sreenPoint.Y);
+                    }), null);
                 });
-                step1Timer.Start();
-            }
+            });
+            step1Timer.Start();
         }
 
         private void OnKeyDown(object sender, KeyEventArgs e)
@@ -210,22 +241,24 @@
             {
                 browser.ShowDevTools();
             }
-            if (e.Key == Key.S && (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift))
+            if (e.Key == Key.Q && (Keyboard.Modifiers & (ModifierKeys.Control)) == (ModifierKeys.Control))
             {
-                Start();
+                MoveMouse();
             }
-        }
 
-        private void Start()
-        {
-            step = 0;
-            browser.GetElementPosition("s_ipt", "kw", (x, y) => {
-                this.Dispatcher.Invoke((Action)(() =>
-                {
-                    var sreenPoint = PointToScreen(new Point(x + 10, y + 25 + 10)); // 25是地址栏的高度
-                    MoveMouseToPoint((int)sreenPoint.X, (int)sreenPoint.Y);
-                }), null);
-            });
+            if (e.Key == Key.D1 && (Keyboard.Modifiers & (ModifierKeys.Control)) == (ModifierKeys.Control))
+            {
+                _step1MousePathCollection.Clear();
+                _isStopRecord = false;
+            }
+
+            if (e.Key == Key.S && (Keyboard.Modifiers & (ModifierKeys.Control)) == (ModifierKeys.Control))
+            {
+                string path1String = JsonConvert.SerializeObject(_step1MousePathCollection);
+                File.WriteAllText("1.txt", path1String);
+
+                _isStopRecord = true;
+            }
         }
 
         private void MoveMouseToPoint(int x, int y)
@@ -236,18 +269,6 @@
 
             movementTimer.Start();
         }
-
-        private void OnBrowserLoadEnd(object sender, WPF.LoadEndEventArgs e)
-        {
-            //browser.GetElementPosition("s_ipt", "kw", (top, bottom, left, right) => {
-            //    this.Dispatcher.Invoke((Action)(() =>
-            //    {
-            //        var sreenPoint = PointToScreen(new Point(top + 10, bottom + 10));
-            //        MoveMouseToPoint((int)sreenPoint.X, (int)sreenPoint.Y);
-            //    }), null);
-            //});
-        }
-
 
         public void SimulateInputString(string sText)
         {
@@ -272,7 +293,9 @@
                             input[0].ki.dwFlags = 0;//按下
                             SendInput(1u, input, Marshal.SizeOf((object)default(INPUT)));
                         }
+                        
                         input[0].type = 1;
+                        input[0].ki.wScan = (short)MapVirtualKeyW(c, MAPVK_VK_TO_VSC);
                         input[0].ki.wVk = (short)(num & 0xFF);
                         input[1].type = 1;
                         input[1].ki.wVk = (short)(num & 0xFF);
@@ -302,6 +325,20 @@
                 input[1].ki.dwExtraInfo = IntPtr.Zero;
                 SendInput(2u, input, Marshal.SizeOf((object)default(INPUT)));
             }
+        }
+
+        private void OnMouseMove(object sender, MouseEventArgs e)
+        {
+            if (!_isStopRecord)
+            {
+                _step1MousePathCollection.Add(PointToScreen(e.GetPosition(this)));
+            }
+        }
+
+        private void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            string tmpPathContent = File.ReadAllText("1.txt");
+            _step1MousePathCollection = JsonConvert.DeserializeObject<List<Point>>(tmpPathContent);
         }
     }
 }
